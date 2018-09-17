@@ -1,27 +1,11 @@
-// Author: Christopher Dreide (https://github.com/Drizzy3D)
-
-
 /*
-	This library provides functions needed to transcribe speech to text
-	using Google's "Cloud Speech-To-Text" API.
+	Author: Christopher Dreide (https://github.com/Drizzy3D)
 
-
-	This is the source code for a go library useable in a C++ Program.
-	To compile you need (additional to the go 64-Bit compiler) the MinGW-w64 compiler (used by cgo).
-	compile with: 
-	go build -o libgostream.dll -buildmode=c-shared stream.go
-
-	To use the API you need to get the Client library:
-	go get -u cloud.google.com/go/speech/apiv1
 	
-	To use the "Cloud Speech-To-Text" API you need an API-Key (see https://cloud.google.com/speech-to-text/docs/quickstart-client-libraries#before-you-begin).
-	You need to set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to your google credentials file (containing your API key).
-	(direct support of using the .json will be added in future)
+	This C++ library written in Go provides functions needed to transcribe 
+	speech to text using Google's "Cloud Speech-To-Text" API.
 	
-	cmd:
-	set GOOGLE_APPLICATION_CREDENTIALS=PATH TO\googlecredentials.json
-	PowerShell:
-	$env:GOOGLE_APPLICATION_CREDENTIALS="PATH TO\googlecredentials.json"
+	See the README.md for instructions on how to use the library.
 */
 
 package main // Needs to remain main package for cgo compiling.
