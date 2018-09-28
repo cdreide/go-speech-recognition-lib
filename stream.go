@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"context"
+	"time"
 	
 	// External (Google) packages:
 	speech "cloud.google.com/go/speech/apiv1"
@@ -94,7 +95,7 @@ func InitializeStream() {
 // Next comment is needed by cgo to know which function to export.
 //export SendAudio
 func SendAudio(recording *C.short, recordingLength C.int){
-		
+
 	// Create a slice of C.short values.
 	var length = int(recordingLength) // Convert recordingLength from C.int to an int value (needed to define the sliceHeader in the following).
 	var list []C.short				// Define a new slice of C.shorts.
@@ -153,6 +154,12 @@ func SendAudio(recording *C.short, recordingLength C.int){
 // Next comment is needed by cgo to know which function to export.
 //export ReceiveTranscript
 func ReceiveTranscript ()  (*_Ctype_char) {
+
+	// Safety check that stream is already initialized
+	for(stream == nil){
+		time.Sleep(200 * time.Nanosecond)
+	}
+
 	// Check if there are results or errors yet (happens parallel to the sending part).
 	for {
 		resp, err := stream.Recv()
