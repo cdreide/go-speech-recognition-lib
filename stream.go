@@ -92,8 +92,8 @@ func InitializeStream() {
 */
 	
 // Next comment is needed by cgo to know which function to export.
-//export SpeechToText
-func SpeechToText(recording *C.short, recordingLength C.int) (*_Ctype_char) {
+//export SendAudio
+func SendAudio(recording *C.short, recordingLength C.int){
 		
 	// Create a slice of C.short values.
 	var length = int(recordingLength) // Convert recordingLength from C.int to an int value (needed to define the sliceHeader in the following).
@@ -146,9 +146,13 @@ func SpeechToText(recording *C.short, recordingLength C.int) (*_Ctype_char) {
 			}
 		}
 	}()
+}
 
 // [RECEIVING]
-	
+
+// Next comment is needed by cgo to know which function to export.
+//export ReceiveTranscript
+func ReceiveTranscript ()  (*_Ctype_char) {
 	// Check if there are results or errors yet (happens parallel to the sending part).
 	for {
 		resp, err := stream.Recv()
@@ -172,8 +176,8 @@ func SpeechToText(recording *C.short, recordingLength C.int) (*_Ctype_char) {
 		}
 	}
 
-// Nothing has been transcribed - therefore we return an empty CString.
-return C.CString("")
+	// Nothing has been transcribed - therefore we return an empty CString.
+	return C.CString("")
 }
 
 // For the sake of completeness (because cgo forces us to declare a main package), we need a main function.
