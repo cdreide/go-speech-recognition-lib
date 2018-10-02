@@ -1,6 +1,5 @@
 /*
 	Author: Christopher Dreide (https://github.com/Drizzy3D)
-
 	
 	This C++ library written in Go provides functions needed to transcribe 
 	speech to text using Google's "Cloud Speech-To-Text" API.
@@ -21,7 +20,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"context"
-	"time"
+//	"time"
+	"fmt"
 	
 	// External (Google) packages:
 	speech "cloud.google.com/go/speech/apiv1"
@@ -86,7 +86,6 @@ func InitializeStream() {
 	
 	recordingLength:
 	just the length of the recording (needed as we can't use C++ vectors in golang)	
-
 	returns: *_Ctype_char
 	(can be received as a string in C++)
 	
@@ -111,6 +110,8 @@ func SendAudio(recording *C.short, recordingLength C.int){
 	temporaryByteBuffer := new(bytes.Buffer)
 	err := binary.Write(temporaryByteBuffer, binary.LittleEndian, list)
 	
+	fmt.Printf("%v \n",length)
+	
 	if err != nil {
 		log.Fatalf("binary.Write failed:", err)
 	}	
@@ -118,7 +119,7 @@ func SendAudio(recording *C.short, recordingLength C.int){
 // [SENDING]
 	
 	// Start of a goroutine, so we can send the recording while parallel waiting for the results.
-	go func() {
+
 		// For sending to google we declare a slice of bytes, that acts as a pipeline.
 		// When it's too big, the streaming is too fast for google, so we cap it at 1024 byte.
 		pipeline := make([]byte, 1024)
@@ -127,26 +128,26 @@ func SendAudio(recording *C.short, recordingLength C.int){
 			// Fill pipeline with the first 1024 values of the byte buffer.
 			// n is needed to keep track of the reading progress
 			n, err := temporaryByteBuffer.Read(pipeline)		
-			
+			fmt.Printf("%v \n", n)
 			// Close stream when reaching the end of the input stream.
 			if err == io.EOF {
-				if err := stream.CloseSend(); err != nil {
-					log.Fatalf("Could not close stream: %v", err)
-				}
+			//	if err := stream.CloseSend(); err != nil {
+			//		log.Fatalf("Could not close stream: %v", err)
+			//	}
 				return
 			}
+			fmt.Printf("sends \n")
+				// Send the pipeline upto the n-th byte (except the last loop run applies n==1024) as a message to google
+				if err := stream.Send(&speechpb.StreamingRecognizeRequest{
+							StreamingRequest: &speechpb.StreamingRecognizeRequest_AudioContent{
+								AudioContent: pipeline[:n],		
+								},
+						});
+				err != nil {
+					log.Printf("Could not send audio: %v", err)
+				}
 			
-			// Send the pipeline upto the n-th byte (except the last loop run applies n==1024) as a message to google
-			if err := stream.Send(&speechpb.StreamingRecognizeRequest{
-						StreamingRequest: &speechpb.StreamingRecognizeRequest_AudioContent{
-							AudioContent: pipeline[:n],		
-							},
-					});
-			err != nil {
-				log.Printf("Could not send audio: %v", err)
-			}
 		}
-	}()
 }
 
 // [RECEIVING]
@@ -156,17 +157,22 @@ func SendAudio(recording *C.short, recordingLength C.int){
 func ReceiveTranscript ()  (*_Ctype_char) {
 
 	// Safety check that stream is already initialized
-	for(stream == nil){
-		time.Sleep(200 * time.Nanosecond)
-	}
-
+//	for(stream == nil){
+	//	time.Sleep(200 * time.Nanosecond)
+	//}
+	fmt.Printf("in ReceiveTranscript")
 	// Check if there are results or errors yet (happens parallel to the sending part).
-	for {
+
+		
+
 		resp, err := stream.Recv()
+		
+		fmt.Printf("after recv")
 		// Error handling.
 		if err == io.EOF {
-			break
+			return C.CString("")
 		}
+		fmt.Printf("afterEOF")
 		if err != nil {
 			log.Fatalf("Cannot stream results: %v", err)
 		}
@@ -181,7 +187,7 @@ func ReceiveTranscript ()  (*_Ctype_char) {
 				return C.CString(result.Transcript)
 			}		
 		}
-	}
+	
 
 	// Nothing has been transcribed - therefore we return an empty CString.
 	return C.CString("")
