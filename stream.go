@@ -3,13 +3,17 @@
 	
 	This C++ library written in Go provides functions needed to transcribe 
 	speech to text using Google's "Cloud Speech-To-Text" API.
+	It needs to be compiled with cgo:
+	"go build -o libgostream.dll -buildmode=c-shared stream.go"
 	
-	See the README.md for instructions on how to use the library.
+	See the README.md for instructions on how to use this library.
 */
 
 package main // Needs to remain main package for cgo compiling.
 
 import (
+
+	// Needed to feature cgo compatibility
 	"C"
 	
 	// Standard packages:
@@ -20,29 +24,37 @@ import (
 	"bytes"
 	"encoding/binary"
 	"context"
-//	"time"
-	"fmt"
-	
-	// External (Google) packages:
+
+	// External (Google) packages (download with "go get -u cloud.google.com/go/speech/apiv1"):
 	speech "cloud.google.com/go/speech/apiv1"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 )
 
-// Global variables needed to maintain the session (currently only partially working).
+// Global variables needed to maintain the session (and to feature an one time initialization).
 var ctx context.Context
 var client* speech.Client
 var stream speechpb.Speech_StreamingRecognizeClient
 
 /*
-	InitializeStream():
-	sets the streaming session up (saved in global varaibles),
+	InitializeStream(cLanguage *_Ctype_char):
+	one time initialization,
+	sets the streaming session up (saved in global variables),
 	sends the initial configuration message
+
+	Parameter:
+
+		cTranscriptLanguage *_Ctype_char
+			(transcription language as a C string (use BCP-47 language tag))
+
 */
 
-// Next comment i needed by cgo to know which function to export.
+// Next comment is needed by cgo to know which function to export.
 //export InitializeStream
-func InitializeStream() {
+func InitializeStream(cTranscriptLanguage *_Ctype_char) {
 	
+	// converts the input C string to a go string (needed to send the initialization message)
+	goTranscriptLanguage := C.GoString(cTranscriptLanguage)
+
 	// Set the context for the stream.
 	ctx = context.Background()
 
@@ -64,8 +76,8 @@ func InitializeStream() {
 					StreamingConfig: &speechpb.StreamingRecognitionConfig{
 						Config: &speechpb.RecognitionConfig{
 							Encoding:        speechpb.RecognitionConfig_LINEAR16,
-							SampleRateHertz: 16000,		// Remember to use a recording with 16KHz sample rate.
-							LanguageCode:    "en-US",	// Can be adjusted to language to be transcribed.
+							SampleRateHertz: 16000,						// Remember to use a recording with 16KHz sample rate.
+							LanguageCode:    goTranscriptLanguage,		// Can be adjusted to language to be transcribed.
 							},
 						},
 					},
@@ -75,20 +87,20 @@ func InitializeStream() {
 	}
 }
 
-
 	
 /*
-	SpeechToText(recording, recordingLength C.int) (*_Ctype_char)
+	SendAudio(recording, recordingLength C.int):
+	prepares the inputted audio data to be sent to google,
+	handles the sending process
 	
-	recording:
-	has to be a Pointer to short values committed by C++ function call
-	(16KHz Audio Stream)
-	
-	recordingLength:
-	just the length of the recording (needed as we can't use C++ vectors in golang)	
-	returns: *_Ctype_char
-	(can be received as a string in C++)
-	
+	Parameters:
+
+		recording:
+			has to be a Pointer to short values committed by C++ function call
+			(16KHz Audio Stream)
+		
+		recordingLength:
+			just the length of the recording (needed as we can't use C++ vectors in golang)	
 */
 	
 // Next comment is needed by cgo to know which function to export.
@@ -96,8 +108,8 @@ func InitializeStream() {
 func SendAudio(recording *C.short, recordingLength C.int){
 
 	// Create a slice of C.short values.
-	var length = int(recordingLength) // Convert recordingLength from C.int to an int value (needed to define the sliceHeader in the following).
-	var list []C.short				// Define a new slice of C.shorts.
+	var length = int(recordingLength) 	// Convert recordingLength from C.int to an int value (needed to define the sliceHeader in the following).
+	var list []C.short			// Define a new slice of C.shorts.
 	
 	// Pass the reference to the input C.short values to the slice's data.
 	sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&list)))
@@ -110,84 +122,75 @@ func SendAudio(recording *C.short, recordingLength C.int){
 	temporaryByteBuffer := new(bytes.Buffer)
 	err := binary.Write(temporaryByteBuffer, binary.LittleEndian, list)
 	
-	fmt.Printf("%v \n",length)
-	
 	if err != nil {
 		log.Fatalf("binary.Write failed:", err)
 	}	
-	
+
+
 // [SENDING]
 	
-	// Start of a goroutine, so we can send the recording while parallel waiting for the results.
+	// For sending to google we declare a slice of bytes, that acts as a pipeline.
+	// When it's too big, the streaming is too fast for google, so we cap it at 1024 byte.
+	pipeline := make([]byte, 1024)
 
-		// For sending to google we declare a slice of bytes, that acts as a pipeline.
-		// When it's too big, the streaming is too fast for google, so we cap it at 1024 byte.
-		pipeline := make([]byte, 1024)
-
-		for {
-			// Fill pipeline with the first 1024 values of the byte buffer.
-			// n is needed to keep track of the reading progress
-			n, err := temporaryByteBuffer.Read(pipeline)		
-			fmt.Printf("%v \n", n)
-			// Close stream when reaching the end of the input stream.
-			if err == io.EOF {
-			//	if err := stream.CloseSend(); err != nil {
-			//		log.Fatalf("Could not close stream: %v", err)
-			//	}
-				return
+	for {
+		// Each loop run: Fill pipeline with the next 1024 values of the byte buffer.
+		// n is needed to keep track of the reading progress
+		n, err := temporaryByteBuffer.Read(pipeline)		
+		
+		if n > 0 {
+			// Send the pipeline upto the n-th byte (except the last loop run n==1024) as a message to google
+			if err := stream.Send(&speechpb.StreamingRecognizeRequest{
+					StreamingRequest: &speechpb.StreamingRecognizeRequest_AudioContent{
+						AudioContent: pipeline[:n],		
+						},
+				});
+			err != nil {
+				log.Printf("Could not send audio: %v", err)
 			}
-			fmt.Printf("sends \n")
-				// Send the pipeline upto the n-th byte (except the last loop run applies n==1024) as a message to google
-				if err := stream.Send(&speechpb.StreamingRecognizeRequest{
-							StreamingRequest: &speechpb.StreamingRecognizeRequest_AudioContent{
-								AudioContent: pipeline[:n],		
-								},
-						});
-				err != nil {
-					log.Printf("Could not send audio: %v", err)
-				}
-			
 		}
+		// Stop streaming when reaching the end of the input stream.
+		if err == io.EOF {
+			return
+		}	
+	}
+
 }
 
-// [RECEIVING]
+
+
+/*
+	ReceiveTranscript ()  (*_Ctype_char):	
+	retrieves and returns the current final transcripts from Google
+
+	returns: 
+		*_Ctype_char
+		(can be received as a string in C++)
+	
+*/
 
 // Next comment is needed by cgo to know which function to export.
 //export ReceiveTranscript
 func ReceiveTranscript ()  (*_Ctype_char) {
 
-	// Safety check that stream is already initialized
-//	for(stream == nil){
-	//	time.Sleep(200 * time.Nanosecond)
-	//}
-	fmt.Printf("in ReceiveTranscript")
-	// Check if there are results or errors yet (happens parallel to the sending part).
+	// Check if there are results or errors yet.
+	resp, err := stream.Recv()
 
-		
-
-		resp, err := stream.Recv()
-		
-		fmt.Printf("after recv")
-		// Error handling.
-		if err == io.EOF {
-			return C.CString("")
-		}
-		fmt.Printf("afterEOF")
-		if err != nil {
-			log.Fatalf("Cannot stream results: %v", err)
-		}
-		if err := resp.Error; err != nil {
-			log.Fatalf("Could not recognize: %v", err)
-		}
-		// Check received message for results and return it as a C.CString.
-		for _, transcribed := range resp.Results {	
-			// Needed to get only the transcription without additional informations i.e. "confidence".
-			for _, result := range transcribed.Alternatives { 
-				// TODO: Handle encoding failures that might happen with some transcribed languages.
-				return C.CString(result.Transcript)
-			}		
-		}
-	
+	// Error handling.
+	if err != nil {
+		log.Fatalf("Cannot stream results: %v", err)
+	}
+	if err := resp.Error; err != nil {
+		log.Fatalf("Could not recognize: %v", err)
+	}
+	// Check received message for results and return it as a C.CString.
+	for _, transcribed := range resp.Results {	
+		// Needed to get only the transcription without additional informations i.e. "confidence".
+		for _, result := range transcribed.Alternatives { 
+			transcript := result.Transcript
+			return C.CString(transcript)
+		}		
+	}
 
 	// Nothing has been transcribed - therefore we return an empty CString.
 	return C.CString("")
