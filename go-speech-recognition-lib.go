@@ -4,7 +4,7 @@
 	This C++ library written in Go provides functions needed to transcribe 
 	speech to text using Google's "Cloud Speech-To-Text" API.
 	It needs to be compiled with cgo:
-	"go build -o libgostream.dll -buildmode=c-shared stream.go"
+	"go build -o go-speech-recognition-lib.dll -buildmode=c-shared go-speech-recognition-lib.go"
 	
 	See the README.md for instructions on how to use this library.
 */
@@ -12,13 +12,11 @@
 package main // Needs to remain main package for cgo compiling.
 
 import (
-
-	// Needed to feature cgo compatibility
-	"C"
+	
+	"C" // Needed to feature cgo compatibility
 	
 	// Standard packages:
 	"io"
-	"log"
 	"reflect"
 	"unsafe"
 	"bytes"
@@ -35,23 +33,30 @@ var ctx context.Context
 var client* speech.Client
 var stream speechpb.Speech_StreamingRecognizeClient
 
+// Used to save error logs
+var logStatus string;
+
+
 /*
 	InitializeStream(cLanguage *_Ctype_char):
 	one time initialization,
 	sets the streaming session up (saved in global variables),
 	sends the initial configuration message
-
 	Parameter:
-
 		cTranscriptLanguage *_Ctype_char
 			(transcription language as a C string (use BCP-47 language tag))
-
+	
+	Return:
+		0 if successful
+		1 if failed (error log can be retrieved with "GetLog()")
 */
 
 // Next comment is needed by cgo to know which function to export.
 //export InitializeStream
-func InitializeStream(cTranscriptLanguage *_Ctype_char) {
+func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int) (C.int) {
 	
+	goSampleRate := int32(cSampleRate)
+
 	// converts the input C string to a go string (needed to send the initialization message)
 	goTranscriptLanguage := C.GoString(cTranscriptLanguage)
 
@@ -61,13 +66,15 @@ func InitializeStream(cTranscriptLanguage *_Ctype_char) {
 	// Create a new Client.
 	client, err := speech.NewClient(ctx)
 	if err != nil {
-		log.Fatal(err)
+		logStatus = err.Error()
+		return C.int(1);
 	}
 	
 	// Create a new Stream.
 	stream, err = client.StreamingRecognize(ctx)
 	if err != nil {
-		log.Fatal(err)
+		logStatus = err.Error()
+		return C.int(1);
 	}
 
 	// Send the initial configuration message.
@@ -76,15 +83,18 @@ func InitializeStream(cTranscriptLanguage *_Ctype_char) {
 					StreamingConfig: &speechpb.StreamingRecognitionConfig{
 						Config: &speechpb.RecognitionConfig{
 							Encoding:        speechpb.RecognitionConfig_LINEAR16,
-							SampleRateHertz: 16000,						// Remember to use a recording with 16KHz sample rate.
+							SampleRateHertz: goSampleRate,						// Remember to use a recording with 16KHz sample rate.
 							LanguageCode:    goTranscriptLanguage,		// Can be adjusted to language to be transcribed.
 							},
 						},
 					},
 				}); 
 	err != nil {
-		log.Fatal(err)
+		logStatus = err.Error()
+		return C.int(1);
 	}
+
+	return C.int(0);
 }
 
 	
@@ -94,18 +104,21 @@ func InitializeStream(cTranscriptLanguage *_Ctype_char) {
 	handles the sending process
 	
 	Parameters:
-
 		recording:
 			has to be a Pointer to short values committed by C++ function call
 			(16KHz Audio Stream)
 		
 		recordingLength:
 			just the length of the recording (needed as we can't use C++ vectors in golang)	
+
+	Return:
+		0 if successful
+		1 if failed (error log can be retrieved with "GetLog()")
 */
 	
 // Next comment is needed by cgo to know which function to export.
 //export SendAudio
-func SendAudio(recording *C.short, recordingLength C.int){
+func SendAudio(recording *C.short, recordingLength C.int) (C.int){
 
 	// Create a slice of C.short values.
 	var length = int(recordingLength) 	// Convert recordingLength from C.int to an int value (needed to define the sliceHeader in the following).
@@ -123,7 +136,8 @@ func SendAudio(recording *C.short, recordingLength C.int){
 	err := binary.Write(temporaryByteBuffer, binary.LittleEndian, list)
 	
 	if err != nil {
-		log.Fatalf("binary.Write failed:", err)
+		logStatus = ("binary.Write failed:" + err.Error())
+		return C.int(1)
 	}	
 
 
@@ -146,27 +160,26 @@ func SendAudio(recording *C.short, recordingLength C.int){
 						},
 				});
 			err != nil {
-				log.Printf("Could not send audio: %v", err)
+				logStatus = ("Could not send audio:" + err.Error())
+				return C.int(1)
 			}
 		}
 		// Stop streaming when reaching the end of the input stream.
 		if err == io.EOF {
-			return
+			logStatus = err.Error()
+			return C.int(0)
 		}	
 	}
 
 }
 
 
-
 /*
 	ReceiveTranscript ()  (*_Ctype_char):	
 	retrieves and returns the current final transcripts from Google
-
-	returns: 
+	Return: 
 		*_Ctype_char
 		(can be received as a string in C++)
-	
 */
 
 // Next comment is needed by cgo to know which function to export.
@@ -175,26 +188,74 @@ func ReceiveTranscript ()  (*_Ctype_char) {
 
 	// Check if there are results or errors yet.
 	resp, err := stream.Recv()
-
 	// Error handling.
 	if err != nil {
-		log.Fatalf("Cannot stream results: %v", err)
+		logStatus = ("Cannot stream results: " + err.Error())
 	}
+
 	if err := resp.Error; err != nil {
-		log.Fatalf("Could not recognize: %v", err)
+		logStatus = ("Could not recognize: " + err.GetMessage())
 	}
+
 	// Check received message for results and return it as a C.CString.
 	for _, transcribed := range resp.Results {	
 		// Needed to get only the transcription without additional informations i.e. "confidence".
 		for _, result := range transcribed.Alternatives { 
-			transcript := result.Transcript
-			return C.CString(transcript)
+			return C.CString(result.Transcript)
 		}		
 	}
 
 	// Nothing has been transcribed - therefore we return an empty CString.
 	return C.CString("")
 }
+
+
+/*
+	GetLog () (*_Ctype_char)
+	returns the last logged event as a String
+
+	Return:
+		logStatus as a CString (usable by C)
+*/
+
+// Next comment is needed by cgo to know which function to export.
+//export GetLog
+func GetLog () (*_Ctype_char) {
+	return C.CString(logStatus);
+}
+
+
+/*
+	CloseStream () (C.int):
+	closes the streaming session
+
+	Return:
+		0 if successful
+		1 if failed (error log can be retrieved with "GetLog()"	
+*/
+
+// not ready yet
+// Next comment is needed by cgo to know which function to export.
+//export CloseStream
+func CloseStream () (C.int) {
+
+	err := stream.CloseSend();
+	if err != nil {
+		logStatus = ("Could not close stream: " + err.Error())
+		return C.int(1)
+	}
+
+	err = client.Close();
+	if err != nil {
+		logStatus = ("Could not close client: " + err.Error())
+		return C.int(1)
+	}
+
+	ctx = nil
+	
+	return C.int(0)
+}
+
 
 // For the sake of completeness (because cgo forces us to declare a main package), we need a main function.
 func main() {}
