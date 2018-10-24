@@ -22,7 +22,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"context"
-
+	"sync"
+ 
 	// External (Google) packages (download with "go get -u cloud.google.com/go/speech/apiv1"):
 	speech "cloud.google.com/go/speech/apiv1"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
@@ -35,6 +36,12 @@ var stream speechpb.Speech_StreamingRecognizeClient
 
 // Used to save error logs
 var logStatus string;
+
+// Used to safely close the stream
+var sendMutex = &sync.Mutex{}
+var receiveMutex = &sync.Mutex{}
+
+var initialized = false
 
 
 /*
@@ -55,6 +62,7 @@ var logStatus string;
 //export InitializeStream
 func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int) (C.int) {
 	
+	// converts the input C integer to a go integger (needed to send the initialization message)
 	goSampleRate := int32(cSampleRate)
 
 	// converts the input C string to a go string (needed to send the initialization message)
@@ -94,6 +102,8 @@ func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int) (C.in
 		return C.int(1);
 	}
 
+
+	initialized = true
 	return C.int(0);
 }
 
@@ -153,13 +163,22 @@ func SendAudio(recording *C.short, recordingLength C.int) (C.int){
 		n, err := temporaryByteBuffer.Read(pipeline)		
 		
 		if n > 0 {
+			
+			// Ensure that the stream is initialized
+			sendMutex.Lock()			
+			// Check if the stream is initialized
+			if initialized == false {
+				logStatus = ("Stream is not initialized")
+				return C.int(1)
+			}	
 			// Send the pipeline upto the n-th byte (except the last loop run n==1024) as a message to google
-			if err := stream.Send(&speechpb.StreamingRecognizeRequest{
+			err := stream.Send(&speechpb.StreamingRecognizeRequest{
 					StreamingRequest: &speechpb.StreamingRecognizeRequest_AudioContent{
 						AudioContent: pipeline[:n],		
 						},
-				});
-			err != nil {
+					});
+			sendMutex.Unlock()
+			if err != nil {
 				logStatus = ("Could not send audio:" + err.Error())
 				return C.int(1)
 			}
@@ -186,8 +205,17 @@ func SendAudio(recording *C.short, recordingLength C.int) (C.int){
 //export ReceiveTranscript
 func ReceiveTranscript ()  (*_Ctype_char) {
 
-	// Check if there are results or errors yet.
-	resp, err := stream.Recv()
+	// Ensure that the stream is initialized
+	receiveMutex.Lock()
+		// Check if the stream is initialized
+		if initialized == false {
+			logStatus = ("Stream is not initialized")
+			return C.CString("")
+		}
+		// Check if there are results or errors yet.
+		resp, err := stream.Recv()
+	receiveMutex.Unlock()
+
 	// Error handling.
 	if err != nil {
 		logStatus = ("Cannot stream results: " + err.Error())
@@ -231,31 +259,43 @@ func GetLog () (*_Ctype_char) {
 
 	Return:
 		0 if successful
-		1 if failed (error log can be retrieved with "GetLog()"	
 */
 
 // not ready yet
 // Next comment is needed by cgo to know which function to export.
 //export CloseStream
-func CloseStream () (C.int) {
-
-	err := stream.CloseSend();
-	if err != nil {
-		logStatus = ("Could not close stream: " + err.Error())
-		return C.int(1)
-	}
-
-	err = client.Close();
-	if err != nil {
-		logStatus = ("Could not close client: " + err.Error())
-		return C.int(1)
-	}
-
-	ctx = nil
+func CloseStream () () {
 	
-	return C.int(0)
+	// Ensure that no sending or receiving is done while closing the stream.
+	sendMutex.Lock()
+	receiveMutex.Lock()
+		stream = nil
+		client = nil
+		ctx = nil
+		initialized = false
+	receiveMutex.Unlock()	
+	sendMutex.Unlock()
 }
 
+
+/*
+	IsInitialized () (C.int)
+	returns the status of initialization
+
+	Return:
+		1 if the stream is initialized
+		0 if the stream is not initialized
+*/
+
+// Next comment is needed by cgo to know which function to export.
+//export IsInitialized
+func IsInitialized () (C.int) {
+	if initialized == true {
+		return C.int(1)
+	} else {
+		return C.int(0)
+	}
+}
 
 // For the sake of completeness (because cgo forces us to declare a main package), we need a main function.
 func main() {}
