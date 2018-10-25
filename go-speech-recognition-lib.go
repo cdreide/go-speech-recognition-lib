@@ -261,7 +261,6 @@ func GetLog () (*_Ctype_char) {
 		0 if successful
 */
 
-// not ready yet
 // Next comment is needed by cgo to know which function to export.
 //export CloseStream
 func CloseStream () () {
