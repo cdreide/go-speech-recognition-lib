@@ -45,14 +45,17 @@ var initialized = false
 
 
 /*
-	InitializeStream(cLanguage *_Ctype_char):
+	InitializeStream(cLanguage *_Ctype_char, cSampleRate C.int):
 	one time initialization,
 	sets the streaming session up (saved in global variables),
 	sends the initial configuration message
 	Parameter:
 		cTranscriptLanguage *_Ctype_char
 			(transcription language as a C string (use BCP-47 language tag))
-	
+		cSampleRate C.int
+			(the sample rate of the audio recording as a C integer value, it's recommended
+			use at least 16kHz)
+		
 	Return:
 		0 if successful
 		1 if failed (error log can be retrieved with "GetLog()")
