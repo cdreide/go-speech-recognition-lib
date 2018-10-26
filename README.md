@@ -51,8 +51,8 @@ First you'll have to add:
 	
 Then we declare the type of the function handles we will use (global):
 ```
-typedef char*(*INITIALIZE_STREAM)();
-typedef char*(*SEND_AUDIO)(const short*, int);
+typedef int(*INITIALIZE_STREAM)(char* cTranscriptLanguage, int cSampleRate);
+typedef int(*SEND_AUDIO)(const short*, int);
 typedef char*(*RECEIVE_TRANSCRIPT)();
 typedef void(*CLOSE_STREAM)();
 typedef char*(*GET_LOG)();
