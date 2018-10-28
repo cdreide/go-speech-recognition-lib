@@ -23,7 +23,7 @@ import (
 	"encoding/binary"
 	"context"
 	"sync"
- 
+
 	// External (Google) packages (download with "go get -u cloud.google.com/go/speech/apiv1"):
 	speech "cloud.google.com/go/speech/apiv1"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
@@ -232,6 +232,11 @@ func ReceiveTranscript ()  (*_Ctype_char) {
 	for _, transcribed := range resp.Results {	
 		// Needed to get only the transcription without additional informations i.e. "confidence".
 		for _, result := range transcribed.Alternatives { 
+			// If the result string starts with a space - remove it
+			if(len(result.Transcript) > 0 && result.Transcript[0] == " "[0]) {
+				return C.CString(result.Transcript[1:])
+			}
+
 			return C.CString(result.Transcript)
 		}		
 	}
