@@ -171,7 +171,7 @@ Now we are ready to compile the source code to a .dll file.
 	
 Compile with (run in the same directory as stream.go): 
 ```
-go build -o libgostream.dll -buildmode=c-shared stream.go
+go build -o go-speech-recognition-lib.dll -buildmode=c-shared go-speech-recognition-lib.go
 ```
 
 In the end you'll have to copy the "libgostream.dll" in the same directory as your compiled C++ program and run your executable.	
