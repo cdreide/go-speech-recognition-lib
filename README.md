@@ -61,7 +61,7 @@ typedef int(*IS_INITIALIZED)();
 	
 Next we want to load the plugin (our .dll). Add this to your function:
 ```
-plugin_handle = LoadLibrary("libgostream.dll");
+plugin_handle = LoadLibrary("go-speech-recognition.dll");
 ```
 	
 With a quick check we ensure that the plugin is loaded properly (else you have to leave the function to avoid runtime errors):
@@ -171,10 +171,10 @@ Now we are ready to compile the source code to a .dll file.
 	
 Compile with (run in the same directory as stream.go): 
 ```
-go build -o go-speech-recognition-lib.dll -buildmode=c-shared go-speech-recognition-lib.go
+go build -o go-speech-recognition.dll -buildmode=c-shared go-speech-recognition.go
 ```
 
-In the end you'll have to copy the "libgostream.dll" in the same directory as your compiled C++ program and run your executable.	
+In the end you'll have to copy the "go-speech-recognition.dll" in the same directory as your compiled C++ program and run your executable.	
 		
 
 ## Authors
