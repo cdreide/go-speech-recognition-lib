@@ -57,8 +57,8 @@ var initialized = false
 			use at least 16kHz)
 		
 	Return:
-		0 if successful
-		1 if failed (error log can be retrieved with "GetLog()")
+		1 if successful
+		0 if failed (error log can be retrieved with "GetLog()")
 */
 
 // Next comment is needed by cgo to know which function to export.
@@ -78,14 +78,14 @@ func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int) (C.in
 	client, err := speech.NewClient(ctx)
 	if err != nil {
 		logStatus = err.Error()
-		return C.int(1);
+		return C.int(0);
 	}
 	
 	// Create a new Stream.
 	stream, err = client.StreamingRecognize(ctx)
 	if err != nil {
 		logStatus = err.Error()
-		return C.int(1);
+		return C.int(0);
 	}
 
 	// Send the initial configuration message.
@@ -102,12 +102,12 @@ func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int) (C.in
 				}); 
 	err != nil {
 		logStatus = err.Error()
-		return C.int(1);
+		return C.int(0);
 	}
 
 
 	initialized = true
-	return C.int(0);
+	return C.int(1);
 }
 
 	
@@ -125,8 +125,8 @@ func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int) (C.in
 			just the length of the recording (needed as we can't use C++ vectors in golang)	
 
 	Return:
-		0 if successful
-		1 if failed (error log can be retrieved with "GetLog()")
+		1 if successful
+		0 if failed (error log can be retrieved with "GetLog()")
 */
 	
 // Next comment is needed by cgo to know which function to export.
@@ -150,7 +150,7 @@ func SendAudio(recording *C.short, recordingLength C.int) (C.int){
 	
 	if err != nil {
 		logStatus = ("binary.Write failed:" + err.Error())
-		return C.int(1)
+		return C.int(0)
 	}	
 
 
@@ -183,13 +183,13 @@ func SendAudio(recording *C.short, recordingLength C.int) (C.int){
 			sendMutex.Unlock()
 			if err != nil {
 				logStatus = ("Could not send audio:" + err.Error())
-				return C.int(1)
+				return C.int(0)
 			}
 		}
 		// Stop streaming when reaching the end of the input stream.
 		if err == io.EOF {
 			logStatus = err.Error()
-			return C.int(0)
+			return C.int(1)
 		}	
 	}
 
@@ -264,9 +264,6 @@ func GetLog () (*_Ctype_char) {
 /*
 	CloseStream () (C.int):
 	closes the streaming session
-
-	Return:
-		0 if successful
 */
 
 // Next comment is needed by cgo to know which function to export.
