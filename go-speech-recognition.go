@@ -4,7 +4,7 @@
 	This C++ library written in Go provides functions needed to transcribe 
 	speech to text using Google's "Cloud Speech-To-Text" API.
 	It needs to be compiled with cgo:
-	"go build -o go-speech-recognition-lib.dll -buildmode=c-shared go-speech-recognition-lib.go"
+	"go build -o go-speech-recognition.dll -buildmode=c-shared go-speech-recognition.go"
 	
 	See the README.md for instructions on how to use this library.
 */
