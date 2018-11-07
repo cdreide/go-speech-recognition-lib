@@ -20,6 +20,7 @@ go get -u cloud.google.com/go/speech/apiv1
 ```
 	
 To use the "Cloud Speech-To-Text" API you need an API-Key (see [Google How-To](https://cloud.google.com/speech-to-text/docs/quickstart-client-libraries#before-you-begin)).
+
 You need to set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to your google credentials file (containing your API key):	
 cmd:
 ```
@@ -183,8 +184,8 @@ Compile with (run in the same directory as stream.go):
 ```
 go build -o go-speech-recognition.dll -buildmode=c-shared go-speech-recognition.go
 ```
-Note: 	You'll not need the "go-speech-recognition.h" produced in this step, ensure that you don't confused it with the one provided by this project.
-	(It's recommendent to delete it)
+Note: 	You'll not need the "go-speech-recognition.h" produced in this step, ensure that you don't confused it with the one provided by this project. (It's recommendent to delete it.)
+	
 In the end you'll have to copy the "go-speech-recognition.dll" in the same directory as your compiled C++ program and run your executable.	
 		
 
