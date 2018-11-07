@@ -183,7 +183,8 @@ Compile with (run in the same directory as stream.go):
 ```
 go build -o go-speech-recognition.dll -buildmode=c-shared go-speech-recognition.go
 ```
-
+Note: 	You'll not need the "go-speech-recognition.h" produced in this step, ensure that you don't confused it with the one provided by this project.
+	(It's recommendent to delete it)
 In the end you'll have to copy the "go-speech-recognition.dll" in the same directory as your compiled C++ program and run your executable.	
 		
 
