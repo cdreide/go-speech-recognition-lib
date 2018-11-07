@@ -43,20 +43,12 @@ You'll need an audiostream represented by short values.
 
 We will load the library at runtime, so you'll have perform a few more steps than just including a header file.
 To achieve this we'll use Windows' HANDLES.
+Furthermore we'll have to copy the go-speech-recognition.h in the project.
 	
 First you'll have to add:
 ```
 #include <windows.h>
-```
-	
-Then we declare the type of the function handles we will use (global):
-```
-typedef int(*INITIALIZE_STREAM)(char* cTranscriptLanguage, int cSampleRate);
-typedef int(*SEND_AUDIO)(const short*, int);
-typedef char*(*RECEIVE_TRANSCRIPT)();
-typedef void(*CLOSE_STREAM)();
-typedef char*(*GET_LOG)();
-typedef int(*IS_INITIALIZED)();
+#include "go-speech-recognition.h"
 ```
 	
 Next we want to load the plugin (our .dll). Add this to your function:
@@ -127,34 +119,52 @@ if (!IsInitialized)
 }
 ```
 	
+In the next turtorial steps an enum, which handles the return values of some functions is used.
+It's declared in the go-speech-recognition.h.
+```
+GO_SPEECH_RECOGNITION_BOOL:
+	GO_SPEECH_RECOGNITION_TRUE
+	GO_SPEECH_RECOGNITION_FALSE
+```
+	
+	
+	
+	
 And now you are able to call the functions provided by the library.
 First initialize the stream (provide a [BCP-47](https://www.rfc-editor.org/rfc/bcp/bcp47.txt) language tag to set the language to be transcribed and the Samplerate of the audio recording as an integer value):
 ```
-InitializeStream("en-US", 16000);
+GO_SPEECH_RECOGNITION_BOOL success = InitializeStream(language, sample_rate);
+if (success != GO_SPEECH_RECOGNITION_TRUE) {
+	std::string log = GetLog();
+	std::cout << "Error:" << log << std::endl;
+	// Or handle the error like you want to
+
+}
 ```
 
-	
+
+To avoid unwanted behavior check (before calling "SendAudio" or "ReceiveTranscript") if the stream is initialized:
+```
+GO_SPEECH_RECOGNITION_BOOL initialized = IsInitialized();
+
+if (initialized != GO_SPEECH_RECOGNITION_TRUE) {
+	// Handle the case, that the stream is not initialized.
+}
+```
+
 Then call the send and receive functions (it's recommended to send and receive parallel in seperate threads):
 ```
-int failed = SendAudio(pointerToRecording->data(), pointerToRecording->size());
-if (failed != 0) {
+GO_SPEECH_RECOGNITION_BOOL success = SendAudio(audio_data.data(), audio_data.size());
+if (success != GO_SPEECH_RECOGNITION_TRUE) {
 	std::string log = GetLog();
-	std::cout << "Error:" << log << std::endl;	// Or handle the error like you want to
+	std::cout << "Error:" << log << std::endl;
+	// Or handle the error like you want to
 }
 ```
 Note: size has to be an Integer representing the sample count of the recording.
 
 ```
 std::string received = ReceiveTranscript();
-```
-
-
-To avoid unwanted behavior check (before calling "SendAudio" or "ReceiveTranscript") if the stream is initialized:
-```
-int initialized = IsInitialized();	// initialized == 1 if the stream is initialized
-if (initialized != 1) {
-	// Handle the case, that the stream is not initialized.
-}
 ```
 
 
@@ -180,4 +190,3 @@ In the end you'll have to copy the "go-speech-recognition.dll" in the same direc
 ## Authors
 
 * **Christopher Dreide** - [Drizzy3D](https://github.com/Drizzy3D)
-
