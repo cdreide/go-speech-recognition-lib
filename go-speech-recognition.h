@@ -13,11 +13,11 @@
 	doesn't support bool transfer between C and Go.
 */
 enum GO_SPEECH_RECOGNITION_BOOL {	GO_SPEECH_RECOGNITION_TRUE = 1,
-									GO_SPEECH_RECOGNITION_FALSE = 0
-								};
+					GO_SPEECH_RECOGNITION_FALSE = 0
+				};
 
 /*
-	GO_SPEECH_RECOGNITION_BOOL InitializeStream(char* cTranscriptLanguage, int cSampleRate):
+	GO_SPEECH_RECOGNITION_BOOL GO_SPEECH_RECOGNITION_InitializeStream(char* cTranscriptLanguage, int cSampleRate):
 	one time initialization,
 	sets the streaming session up (saved in global variables),
 	sends the initial configuration message
@@ -33,10 +33,10 @@ enum GO_SPEECH_RECOGNITION_BOOL {	GO_SPEECH_RECOGNITION_TRUE = 1,
 		GO_SPEECH_RECOGNITION_TRUE if successful
 		GO_SPEECH_RECOGNITION_FALSE if failed (error log can be retrieved with "GetLog()")
 */
-typedef GO_SPEECH_RECOGNITION_BOOL(*INITIALIZE_STREAM)(char* cTranscriptLanguage, int cSampleRate);
+typedef GO_SPEECH_RECOGNITION_BOOL(*GO_SPEECH_RECOGNITION_INITIALIZE_STREAM)(char* cTranscriptLanguage, int cSampleRate);
 
 /*
-	GO_SPEECH_RECOGNITION_BOOL SendAudio(const short* recording, int recording_size):
+	GO_SPEECH_RECOGNITION_BOOL GO_SPEECH_RECOGNITION_SendAudio(const short* recording, int recording_size):
 	prepares the inputted audio data to be sent to google,
 	handles the sending process
 	
@@ -51,40 +51,40 @@ typedef GO_SPEECH_RECOGNITION_BOOL(*INITIALIZE_STREAM)(char* cTranscriptLanguage
 		GO_SPEECH_RECOGNITION_TRUE if successful
 		GO_SPEECH_RECOGNITION_FALSE if failed (error log can be retrieved with "GetLog()")
 */
-typedef GO_SPEECH_RECOGNITION_BOOL(*SEND_AUDIO)(const short* recording, int recording_size);
+typedef GO_SPEECH_RECOGNITION_BOOL(*GO_SPEECH_RECOGNITION_SEND_AUDIO)(const short* recording, int recording_size);
 
 /*
-	char* ReceiveTranscript ():
+	char* GO_SPEECH_RECOGNITION_ReceiveTranscript ():
 	retrieves and returns the current final transcripts from Google
 	
 	Return:
 		char* (current transcript)
 */
-typedef char*(*RECEIVE_TRANSCRIPT)();
+typedef char*(*GO_SPEECH_RECOGNITION_RECEIVE_TRANSCRIPT)();
 
 /*
-	char* GetLog ():
+	char* GO_SPEECH_RECOGNITION_GetLog ():
 	returns the last logged event as a String/char*
 	
 	Return:
 		char* (last logged event)
 */
-typedef char*(*GET_LOG)();
+typedef char*(*GO_SPEECH_RECOGNITION_GET_LOG)();
 
 
 /*
-	void CloseStream ():
+	void GO_SPEECH_RECOGNITION_CloseStream ():
 	closes the streaming session, all accesses to the streaming object
 	in the go-speech-recognition.dll are secured by mutex
 */
-typedef GO_SPEECH_RECOGNITION_BOOL(*CLOSE_STREAM)();
+typedef GO_SPEECH_RECOGNITION_BOOL(*GO_SPEECH_RECOGNITION_CLOSE_STREAM)();
 
 /*
-	GO_SPEECH_RECOGNITION_BOOL IsInitialized ():
+	GO_SPEECH_RECOGNITION_BOOL GO_SPEECH_RECOGNITION_IsInitialized ():
 	returns the status of initialization
 
 	Return:
 		GO_SPEECH_RECOGNITION_TRUE if the stream is initialized
 		GO_SPEECH_RECOGNITION_FALSE if the stream is not initialized
 */
-typedef GO_SPEECH_RECOGNITION_BOOL(*IS_INITIALIZED)();
+typedef GO_SPEECH_RECOGNITION_BOOL(*GO_SPEECH_RECOGNITION_IS_INITIALIZED)();
