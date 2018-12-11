@@ -165,55 +165,67 @@ func SendAudio(recording *C.short, recordingLength C.int) (C.int){
 		// n is needed to keep track of the reading progress
 		n, err := temporaryByteBuffer.Read(pipeline)		
 		
+		// Stop streaming when reaching the end of the input stream.
+		if err == io.EOF {
+			return C.int(1)
+		}
+
 		if n > 0 {
 			
 			// Ensure that the stream is initialized
 			sendMutex.Lock()			
-			// Check if the stream is initialized
-			if initialized == false {
-				logStatus = ("Stream is not initialized")
-				return C.int(1)
-			}	
-			// Send the pipeline upto the n-th byte (except the last loop run n==1024) as a message to google
-			err := stream.Send(&speechpb.StreamingRecognizeRequest{
-					StreamingRequest: &speechpb.StreamingRecognizeRequest_AudioContent{
-						AudioContent: pipeline[:n],		
-						},
-					});
+				// Check if the stream is initialized
+				if initialized == false {
+
+					sendMutex.Unlock()
+
+					logStatus = ("Stream is not initialized")
+					return C.int(1)
+				}	
+				// Send the pipeline upto the n-th byte (except the last loop run n==1024) as a message to google
+				err := stream.Send(&speechpb.StreamingRecognizeRequest{
+						StreamingRequest: &speechpb.StreamingRecognizeRequest_AudioContent{
+							AudioContent: pipeline[:n],		
+							},
+						});
+
 			sendMutex.Unlock()
+
 			if err != nil {
 				logStatus = ("Could not send audio:" + err.Error())
 				return C.int(0)
 			}
 		}
-		// Stop streaming when reaching the end of the input stream.
-		if err == io.EOF {
-			logStatus = err.Error()
-			return C.int(1)
-		}	
 	}
-
 }
 
 
 /*
-	ReceiveTranscript ()  (*_Ctype_char):	
-	retrieves and returns the current final transcripts from Google
-	Return: 
-		*_Ctype_char
-		(can be received as a string in C++)
+	ReceiveTranscript (output **C.char) (C.int):	
+	retrieves and saves the current final transcripts from Google
+	
+	After the call output contains the current final transcript 
+	
+	Parameters:
+		output:
+			The pointer which is used to store the current final transcript
+				
+	Return:
+		1 if successful
+		0 if failed (error log can be retrieved with "GetLog()")
 */
 
 // Next comment is needed by cgo to know which function to export.
 //export ReceiveTranscript
-func ReceiveTranscript ()  (*_Ctype_char) {
+func ReceiveTranscript (output **C.char) (C.int) {
 
 	// Ensure that the stream is initialized
 	receiveMutex.Lock()
 		// Check if the stream is initialized
 		if initialized == false {
+			receiveMutex.Unlock()
 			logStatus = ("Stream is not initialized")
-			return C.CString("")
+			return C.int(0)
 		}
 		// Check if there are results or errors yet.
 		resp, err := stream.Recv()
@@ -222,10 +234,12 @@ func ReceiveTranscript ()  (*_Ctype_char) {
 	// Error handling.
 	if err != nil {
 		logStatus = ("Cannot stream results: " + err.Error())
+		return C.int(0)
 	}
 
 	if err := resp.Error; err != nil {
 		logStatus = ("Could not recognize: " + err.GetMessage())
+		return C.int(0)
 	}
 
 	// Check received message for results and return it as a C.CString.
@@ -234,15 +248,18 @@ func ReceiveTranscript ()  (*_Ctype_char) {
 		for _, result := range transcribed.Alternatives { 
 			// If the result string starts with a space - remove it
 			if(len(result.Transcript) > 0 && result.Transcript[0] == " "[0]) {
-				return C.CString(result.Transcript[1:])
+				// Fill output
+				*output = C.CString(result.Transcript[1:])
+				return C.int(1)
 			}
-
-			return C.CString(result.Transcript)
+			// Fill output
+			*output = C.CString(result.Transcript)
+			return C.int(1)
 		}		
 	}
 
-	// Nothing has been transcribed - therefore we return an empty CString.
-	return C.CString("")
+	// Output should remain empty 
+	return C.int(1)
 }
 
 
@@ -277,7 +294,7 @@ func CloseStream () () {
 		client = nil
 		ctx = nil
 		initialized = false
-	receiveMutex.Unlock()	
+	receiveMutex.Unlock()
 	sendMutex.Unlock()
 }
 
