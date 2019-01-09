@@ -63,13 +63,16 @@ var initialized = false
 
 // Next comment is needed by cgo to know which function to export.
 //export InitializeStream
-func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int) (C.int) {
+func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int, cTranscriptionModel *_Ctype_char) (C.int) {
 	
 	// converts the input C integer to a go integger (needed to send the initialization message)
 	goSampleRate := int32(cSampleRate)
 
 	// converts the input C string to a go string (needed to send the initialization message)
 	goTranscriptLanguage := C.GoString(cTranscriptLanguage)
+
+	// converts the input C string to a go string (needed to send the initialization message)
+	goTranscriptionModel := C.GoString(cTranscriptionModel)
 
 	// Set the context for the stream.
 	ctx = context.Background()
@@ -93,9 +96,10 @@ func InitializeStream(cTranscriptLanguage *_Ctype_char, cSampleRate C.int) (C.in
 				StreamingRequest: &speechpb.StreamingRecognizeRequest_StreamingConfig{
 					StreamingConfig: &speechpb.StreamingRecognitionConfig{
 						Config: &speechpb.RecognitionConfig{
-							Encoding:        speechpb.RecognitionConfig_LINEAR16,
-							SampleRateHertz: goSampleRate,						// Remember to use a recording with 16KHz sample rate.
-							LanguageCode:    goTranscriptLanguage,		// Can be adjusted to language to be transcribed.
+							Encoding:			speechpb.RecognitionConfig_LINEAR16,
+							SampleRateHertz:	goSampleRate,				// Remember to use a recording with 16KHz sample rate.
+							LanguageCode:		goTranscriptLanguage,		// Can be adjusted to language to be transcribed. (BCP-47)
+							Model:				goTranscriptionModel,		// Can be either "video", "phone_call", "command_and_search", "default" (see https://cloud.google.com/speech-to-text/docs/basics)
 							},
 						},
 					},
