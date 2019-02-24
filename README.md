@@ -168,6 +168,17 @@ if (success != GO_SPEECH_RECOGNITION_TRUE) {
 ```
 Note: size has to be an Integer representing the sample count of the recording.
 
+
+
+While using the ReceiveTranscript function you need to provide a reference to a char* variable which will be overwritten with the current transcript.
+The transcript (when "maxAlternatives" is set > 1 ) will be transcoded by using ";" to split the alternatives, e.g.:
+
+- maxAlternatives: 3
+- Spoken: "word"
+- Result: "word;work;worked"
+
+The list is build with descending confidence rating ("word" is the best guess, "work" the second best...).
+
 ```
 char* received; 
 GO_SPEECH_RECOGNITION_BOOL success = ReceiveTranscript(&received);
